@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบวิเคราะห์การเข้าเรียน นักเรียน ปวช.</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #4f46e5;
+    --primary-dark: #3730a3;
+    --primary-light: #e0e7ff;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #3b82f6;
+    --sidebar-bg: #1e1b4b;
+    --sidebar-text: #c7d2fe;
+    --sidebar-hover: #312e81;
+    --sidebar-active: #4f46e5;
+    --bg: #f1f5f9;
+    --card-bg: #ffffff;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+
+  /* ===== SIDEBAR ===== */
+  #sidebar {
+    width: 240px; min-width: 240px;
+    background: var(--sidebar-bg);
+    display: flex; flex-direction: column;
+    box-shadow: 4px 0 12px rgba(0,0,0,0.3);
+    z-index: 10;
+  }
+  .sidebar-logo {
+    padding: 20px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    text-align: center;
+  }
+  .sidebar-logo .logo-icon { font-size: 2rem; margin-bottom: 4px; }
+  .sidebar-logo h2 { color: #fff; font-size: 0.95rem; font-weight: 700; line-height: 1.4; }
+  .sidebar-logo p { color: var(--sidebar-text); font-size: 0.72rem; margin-top: 2px; }
+
+  .nav-section { padding: 12px 0; flex: 1; overflow-y: auto; }
+  .nav-label {
+    color: #818cf8; font-size: 0.65rem; font-weight: 700;
+    letter-spacing: 0.1em; padding: 8px 16px 4px; text-transform: uppercase;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 16px; cursor: pointer;
+    color: var(--sidebar-text); font-size: 0.875rem;
+    transition: all 0.2s; border-left: 3px solid transparent;
+    user-select: none;
+  }
+  .nav-item:hover { background: var(--sidebar-hover); color: #fff; }
+  .nav-item.active {
+    background: var(--sidebar-active);
+    color: #fff; border-left-color: #a5b4fc;
+    font-weight: 600;
+  }
+  .nav-item .icon { font-size: 1.1rem; width: 22px; text-align: center; }
+  .badge {
+    margin-left: auto; background: var(--danger);
+    color: #fff; border-radius: 20px;
+    font-size: 0.65rem; padding: 1px 7px; font-weight: 700;
+  }
+  .badge.warn { background: var(--warning); color: #1e1b4b; }
+
+  /* ===== MAIN CONTENT ===== */
+  #main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+  .topbar {
+    background: #fff; padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 5;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .topbar h1 { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+  .topbar .meta { font-size: 0.8rem; color: var(--text-muted); }
+  .topbar .meta span { font-weight: 600; color: var(--primary); }
+
+  .content { padding: 20px 24px; flex: 1; }
+
+  /* Sections */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ===== CARDS ===== */
+  .card {
+    background: var(--card-bg); border-radius: 12px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+    padding: 20px; margin-bottom: 20px;
+    border: 1px solid var(--border);
+  }
+  .card-title {
+    font-size: 0.95rem; font-weight: 700;
+    color: var(--text); margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ===== STAT CARDS ===== */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .stat-card {
+    background: var(--card-bg); border-radius: 12px;
+    padding: 16px; border: 1px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    display: flex; align-items: center; gap: 14px;
+  }
+  .stat-icon { font-size: 2rem; }
+  .stat-info .label { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-info .value { font-size: 1.6rem; font-weight: 800; line-height: 1.1; margin-top: 2px; }
+  .stat-info .sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+  .stat-card.green .value { color: var(--success); }
+  .stat-card.red .value { color: var(--danger); }
+  .stat-card.yellow .value { color: var(--warning); }
+  .stat-card.blue .value { color: var(--info); }
+  .stat-card.purple .value { color: var(--primary); }
+
+  /* ===== FILTERS ===== */
+  .filter-bar {
+    background: var(--card-bg); border-radius: 12px;
+    padding: 14px 18px; margin-bottom: 18px;
+    border: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
+  .filter-group label { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .filter-group select, .filter-group input {
+    padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 0.85rem; color: var(--text); background: #fff;
+    outline: none; transition: border 0.2s;
+  }
+  .filter-group select:focus, .filter-group input:focus { border-color: var(--primary); }
+  .btn {
+    padding: 7px 16px; border-radius: 8px; border: none;
+    cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    transition: all 0.2s;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: var(--bg); }
+
+  /* ===== TABLE ===== */
+  .table-wrapper { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+  thead th {
+    background: #f8fafc; color: var(--text-muted);
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid #f1f5f9; transition: background 0.15s; }
+  tbody tr:hover { background: #f8fafc; }
+  tbody td { padding: 9px 14px; white-space: nowrap; }
+
+  /* Status badges */
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 0.75rem; font-weight: 600;
+  }
+  .status-มาเรียน { background: #dcfce7; color: #166534; }
+  .status-ขาด { background: #fee2e2; color: #991b1b; }
+  .status-สาย { background: #fef3c7; color: #92400e; }
+  .status-ลา { background: #dbeafe; color: #1e40af; }
+  .status-ส่งแล้ว { background: #dcfce7; color: #166534; }
+  .status-ยังไม่ส่ง { background: #fee2e2; color: #991b1b; }
+  .status-missing { background: #f3f4f6; color: #6b7280; font-style: italic; }
+
+  /* ===== CHARTS ===== */
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 20px; }
+  .chart-card { background: var(--card-bg); border-radius: 12px; padding: 18px; border: 1px solid var(--border); box-shadow: 0 1px 6px rgba(0,0,0,0.05); }
+  .chart-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 14px; color: var(--text); }
+  .chart-container { position: relative; height: 260px; }
+
+  /* ===== ERROR SECTION ===== */
+  .error-list { display: flex; flex-direction: column; gap: 12px; }
+  .error-item {
+    background: #fff; border-radius: 10px; padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--danger);
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .error-item.warn { border-left-color: var(--warning); }
+  .error-item.info { border-left-color: var(--info); }
+  .error-icon { font-size: 1.3rem; margin-top: 1px; }
+  .error-body { flex: 1; }
+  .error-title { font-weight: 700; font-size: 0.88rem; margin-bottom: 4px; }
+  .error-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+  .error-meta { margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .error-tag {
+    background: #f1f5f9; border-radius: 6px;
+    padding: 2px 8px; font-size: 0.72rem; color: var(--text-muted);
+    font-family: monospace;
+  }
+  .error-tag.red { background: #fee2e2; color: #991b1b; }
+  .error-tag.yellow { background: #fef3c7; color: #92400e; }
+  .error-tag.blue { background: #dbeafe; color: #1e40af; }
+
+  .error-summary-bar {
+    display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .err-count {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 18px; display: flex; align-items: center; gap: 10px;
+    flex: 1; min-width: 140px;
+  }
+  .err-count .num { font-size: 1.5rem; font-weight: 800; }
+  .err-count .lbl { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
+  .err-count.red .num { color: var(--danger); }
+  .err-count.yellow .num { color: var(--warning); }
+  .err-count.blue .num { color: var(--info); }
+
+  /* ===== SUMMARY ===== */
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .summary-table th { background: var(--primary-light); color: var(--primary-dark); }
+  .progress-bar-wrap { background: #f1f5f9; border-radius: 20px; height: 10px; overflow: hidden; margin-top: 4px; }
+  .progress-bar { height: 100%; border-radius: 20px; transition: width 0.6s; }
+  .prog-green { background: var(--success); }
+  .prog-red { background: var(--danger); }
+  .prog-yellow { background: var(--warning); }
+  .prog-blue { background: var(--info); }
+
+  /* ===== PAGINATION ===== */
+  .pager { display: flex; align-items: center; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+  .pager button {
+    padding: 5px 11px; border-radius: 6px; border: 1px solid var(--border);
+    background: #fff; cursor: pointer; font-size: 0.82rem; transition: all 0.15s;
+  }
+  .pager button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .pager button:hover:not(.active) { background: var(--bg); }
+  .pager-info { font-size: 0.8rem; color: var(--text-muted); margin-right: 6px; }
+
+  @media (max-width: 768px) {
+    .charts-grid, .summary-grid { grid-template-columns: 1fr; }
+    #sidebar { width: 200px; min-width: 200px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== SIDEBAR ===== -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📚</div>
+    <h2>ระบบวิเคราะห์<br>การเข้าเรียน</h2>
+    <p>Student Attendance System</p>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">หน้าหลัก</div>
+    <div class="nav-item active" onclick="showSection('dashboard')">
+      <span class="icon">🏠</span> ภาพรวม Dashboard
+    </div>
+
+    <div class="nav-label">ข้อมูล</div>
+    <div class="nav-item" onclick="showSection('table')">
+      <span class="icon">📋</span> ตารางข้อมูล
+    </div>
+    <div class="nav-item" onclick="showSection('charts')">
+      <span class="icon">📊</span> กราฟ & วิเคราะห์
+    </div>
+
+    <div class="nav-label">ตรวจสอบ</div>
+    <div class="nav-item" onclick="showSection('errors')">
+      <span class="icon">⚠️</span> ข้อผิดพลาดในข้อมูล
+      <span class="badge" id="err-badge">7</span>
+    </div>
+
+    <div class="nav-label">สรุปผล</div>
+    <div class="nav-item" onclick="showSection('summary')">
+      <span class="icon">📝</span> สรุปข้อมูล
+    </div>
+  </div>
+</nav>
+
+<!-- ===== MAIN ===== -->
+<div id="main">
+  <div class="topbar">
+    <h1 id="page-title">📊 ภาพรวม Dashboard</h1>
+    <div class="meta">ข้อมูล: <span>60 รายการ</span> | ห้อง: <span>ปวช.1/1, ปวช.1/2</span> | <span id="date-range">2 – 9 พ.ย. 2026</span></div>
+  </div>
+
+  <div class="content">
+
+    <!-- ======== DASHBOARD ======== -->
+    <div class="section active" id="sec-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card green">
+          <div class="stat-icon">✅</div>
+          <div class="stat-info">
+            <div class="label">มาเรียน</div>
+            <div class="value" id="cnt-present">-</div>
+            <div class="sub">รายการ</div>
+          </div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-icon">❌</div>
+          <div class="stat-info">
+            <div class="label">ขาด</div>
+            <div class="value" id="cnt-absent">-</div>
+            <div class="sub">รายการ</div>
+          </div>
+        </div>
+        <div class="stat-card yellow">
+          <div class="stat-icon">⏰</div>
+          <div class="stat-info">
+            <div class="label">สาย</div>
+            <div class="value" id="cnt-late">-</div>
+            <div class="sub">รายการ</div>
+          </div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-icon">📄</div>
+          <div class="stat-info">
+            <div class="label">ลา</div>
+            <div class="value" id="cnt-leave">-</div>
+            <div class="sub">รายการ</div>
+          </div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-icon">📤</div>
+          <div class="stat-info">
+            <div class="label">ส่งงานแล้ว</div>
+            <div class="value" id="cnt-submitted">-</div>
+            <div class="sub">รายการ</div>
+          </div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-icon">📭</div>
+          <div class="stat-info">
+            <div class="label">ยังไม่ส่งงาน</div>
+            <div class="value" id="cnt-notsubmit">-</div>
+            <div class="sub">รายการ</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mini Charts -->
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">📊 สัดส่วนสถานะเข้าเรียน (ภาพรวม)</div>
+          <div class="chart-container"><canvas id="dash-pie"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">📈 จำนวนการเข้าเรียนแยกตามวิชา</div>
+          <div class="chart-container"><canvas id="dash-bar"></canvas></div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">📊 สถานะส่งงาน (ภาพรวม)</div>
+          <div class="chart-container"><canvas id="dash-submit-pie"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">📈 เปรียบเทียบห้องเรียน</div>
+          <div class="chart-container"><canvas id="dash-room-bar"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======== TABLE ======== -->
+    <div class="section" id="sec-table">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>ห้องเรียน</label>
+          <select id="f-room" onchange="applyFilters()">
+            <option value="">ทั้งหมด</option>
+            <option>ปวช.1/1</option>
+            <option>ปวช.1/2</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>วิชา</label>
+          <select id="f-subject" onchange="applyFilters()">
+            <option value="">ทั้งหมด</option>
+            <option>การเขียนโปรแกรม</option>
+            <option>ฐานข้อมูล</option>
+            <option>การสร้างเว็บไซต์</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>สถานะเข้าเรียน</label>
+          <select id="f-status" onchange="applyFilters()">
+            <option value="">ทั้งหมด</option>
+            <option>มาเรียน</option>
+            <option>ขาด</option>
+            <option>สาย</option>
+            <option>ลา</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>สถานะส่งงาน</label>
+          <select id="f-submit" onchange="applyFilters()">
+            <option value="">ทั้งหมด</option>
+            <option>ส่งแล้ว</option>
+            <option>ยังไม่ส่ง</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>วันที่</label>
+          <input type="date" id="f-date" onchange="applyFilters()" />
+        </div>
+        <button class="btn btn-primary" onclick="applyFilters()">🔍 กรอง</button>
+        <button class="btn btn-outline" onclick="clearFilters()">✖ ล้าง</button>
+      </div>
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>รหัสบันทึก</th>
+                <th>วันที่</th>
+                <th>รหัสนักเรียน</th>
+                <th>ห้องเรียน</th>
+                <th>วิชา</th>
+                <th>สถานะเข้าเรียน</th>
+                <th>นาทีที่สาย</th>
+                <th>ชั่วโมงเรียน</th>
+                <th>สถานะส่งงาน</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+        <div style="padding:10px 14px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+          <div class="pager-info" id="pager-info"></div>
+          <div class="pager" id="pager"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======== CHARTS ======== -->
+    <div class="section" id="sec-charts">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>ห้องเรียน</label>
+          <select id="cf-room" onchange="renderCharts()">
+            <option value="">ทั้งหมด</option>
+            <option>ปวช.1/1</option>
+            <option>ปวช.1/2</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>วิชา</label>
+          <select id="cf-subject" onchange="renderCharts()">
+            <option value="">ทั้งหมด</option>
+            <option>การเขียนโปรแกรม</option>
+            <option>ฐานข้อมูล</option>
+            <option>การสร้างเว็บไซต์</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">🥧 สัดส่วนสถานะเข้าเรียน</div>
+          <div class="chart-container"><canvas id="c-att-pie"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">📊 จำนวนแยกตามสถานะ (Bar)</div>
+          <div class="chart-container"><canvas id="c-att-bar"></canvas></div>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">🥧 สัดส่วนการส่งงาน</div>
+          <div class="chart-container"><canvas id="c-sub-pie"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">📊 การเข้าเรียนแยกตามวิชา (Grouped Bar)</div>
+          <div class="chart-container"><canvas id="c-subject-bar"></canvas></div>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">📊 เปรียบเทียบสถานะแยกห้อง (Bar)</div>
+          <div class="chart-container"><canvas id="c-room-bar"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">📊 นาทีที่สายแยกนักเรียน (Bar)</div>
+          <div class="chart-container"><canvas id="c-late-bar"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======== ERRORS ======== -->
+    <div class="section" id="sec-errors">
+      <div class="error-summary-bar">
+        <div class="err-count red">
+          <div>🚨</div>
+          <div>
+            <div class="num">3</div>
+            <div class="lbl">ข้อผิดพลาดร้ายแรง</div>
+          </div>
+        </div>
+        <div class="err-count yellow">
+          <div>⚠️</div>
+          <div>
+            <div class="num">3</div>
+            <div class="lbl">ข้อควรระวัง</div>
+          </div>
+        </div>
+        <div class="err-count blue">
+          <div>ℹ️</div>
+          <div>
+            <div class="num">1</div>
+            <div class="lbl">ข้อสังเกต</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⚠️ รายการข้อผิดพลาดและความผิดปกติในชุดข้อมูล</div>
+        <div class="error-list" id="error-list"></div>
+      </div>
+
+      <div class="card" style="margin-top:0;">
+        <div class="card-title">📋 ตารางข้อมูลที่มีข้อผิดพลาด</div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>รหัสบันทึก</th>
+                <th>วันที่</th>
+                <th>รหัสนักเรียน</th>
+                <th>ห้องเรียน</th>
+                <th>วิชา</th>
+                <th>สถานะเข้าเรียน</th>
+                <th>นาทีที่สาย</th>
+                <th>ชั่วโมงเรียน</th>
+                <th>สถานะส่งงาน</th>
+                <th>ข้อผิดพลาด</th>
+              </tr>
+            </thead>
+            <tbody id="error-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======== SUMMARY ======== -->
+    <div class="section" id="sec-summary">
+      <div class="card">
+        <div class="card-title">📝 สรุปภาพรวมชุดข้อมูล</div>
+        <div class="stats-grid">
+          <div class="stat-card blue">
+            <div class="stat-icon">📁</div>
+            <div class="stat-info">
+              <div class="label">รายการทั้งหมด</div>
+              <div class="value">60</div>
+              <div class="sub">รายการ (ก่อนทำความสะอาด)</div>
+            </div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon">✅</div>
+            <div class="stat-info">
+              <div class="label">รายการที่ถูกต้อง</div>
+              <div class="value">53</div>
+              <div class="sub">รายการ</div>
+            </div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-icon">🚨</div>
+            <div class="stat-info">
+              <div class="label">รายการมีปัญหา</div>
+              <div class="value">7</div>
+              <div class="sub">รายการ</div>
+            </div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-icon">🏫</div>
+            <div class="stat-info">
+              <div class="label">จำนวนห้อง</div>
+              <div class="value">2</div>
+              <div class="sub">ปวช.1/1, ปวช.1/2</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="card">
+          <div class="card-title">📊 สรุปสถานะการเข้าเรียน</div>
+          <div id="summary-att-table"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 สรุปการส่งงาน</div>
+          <div id="summary-sub-table"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 สรุปแยกตามห้องเรียน</div>
+          <div id="summary-room-table"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 สรุปแยกตามวิชา</div>
+          <div id="summary-subject-table"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🔍 ข้อสังเกตและข้อเสนอแนะจากการวิเคราะห์ข้อมูล</div>
+        <div id="insights"></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+// =====================================================================
+//  RAW DATA (from student_attendance_dirty_60.csv)
+// =====================================================================
+const RAW = [
+  {id:"A001",date:"2026-11-02",sid:"S001",room:"ปวช.1/1",subject:"การเขียนโปรแกรม",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A002",date:"2026-11-02",sid:"S002",room:"ปวช.1/1",subject:"การเขียนโปรแกรม",status:"มาเรียน",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A003",date:"2026-11-02",sid:"S003",room:"ปวช.1/1",subject:"การเขียนโปรแกรม",status:"ขาด",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A004",date:"2026-11-02",sid:"S004",room:"ปวช.1/1",subject:"การเขียนโปรแกรม",status:"สาย",late:15,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A005",date:"2026-11-02",sid:"S005",room:"ปวช.1/1",subject:"การเขียนโปรแกรม",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A006",date:"2026-11-02",sid:"S006",room:"ปวช.1/2",subject:"การเขียนโปรแกรม",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A007",date:"2026-11-02",sid:"S007",room:"ปวช.1/2",subject:"การเขียนโปรแกรม",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A008",date:"2026-11-02",sid:"S008",room:"ปวช.1/2",subject:"การเขียนโปรแกรม",status:"ลา",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A009",date:"2026-11-02",sid:"S009",room:"ปวช.1/2",subject:"การเขียนโปรแกรม",status:" มาเรียน ",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A010",date:"2026-11-02",sid:"S010",room:"ปวช.1/2",subject:"การเขียนโปรแกรม",status:"ลา",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A011",date:"2026-11-03",sid:"S001",room:"ปวช.1/1",subject:"ฐานข้อมูล",status:"สาย",late:5,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A012",date:"2026-11-03",sid:"S002",room:"ปวช.1/1",subject:"ฐานข้อมูล",status:"ขาด",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A013",date:"2026-11-03",sid:"S003",room:"ปวช.1/1",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A014",date:"2026-11-03",sid:"S004",room:"ปวช.1/1",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A015",date:"2026-11-03",sid:"S005",room:"ปวช.1/1",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A016",date:"2026-11-03",sid:"S006",room:"ปวช.1/2",subject:"ฐานข้อมูล",status:"ขาด",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A017",date:"2026-11-03",sid:"S007",room:"ปวช.1/2",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:2,submit:""},
+  {id:"A018",date:"2026-11-03",sid:"S008",room:"ปวช.1/2",subject:"ฐานข้อมูล",status:"ลา",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A019",date:"2026-11-03",sid:"S009",room:"ปวช.1/2",subject:"ฐานข้อมูล",status:"สาย",late:10,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A020",date:"2026-11-03",sid:"S010",room:"ปวช.1/2",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A021",date:"2026-11-04",sid:"S001",room:"ปวช.1/1",subject:"การสร้างเว็บไซต์",status:"สาย",late:30,hours:2,submit:"ส่งแล้ว"},
+  {id:"A022",date:"2026-11-04",sid:"S002",room:"ปวช.1/1",subject:"การสร้างเว็บไซต์",status:"ขาด",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A023",date:"2026-11-04",sid:"S003",room:"ปวช.1/1",subject:"การสร้างเว็บไซต์",status:"ขาด",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A024",date:"2026-11-04",sid:"S004",room:"ปวช.1/1",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A025",date:"2026-11-04",sid:"S005",room:"ปวช.1/1",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A026",date:"2026-11-04",sid:"S006",room:"ปวช.1/2",subject:"การสร้างเว็บไซต์",status:"สาย",late:-10,hours:2,submit:"ส่งแล้ว"},
+  {id:"A027",date:"2026-11-04",sid:"S007",room:"ปวช.1/2",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A028",date:"2026-11-04",sid:"S008",room:"ปวช.1/2",subject:"การสร้างเว็บไซต์",status:"ขาด",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A029",date:"2026-11-04",sid:"S009",room:"ปวช.1/2",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A030",date:"2026-11-04",sid:"S010",room:"ปวช.1/2",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A031",date:"2026-11-05",sid:"S001",room:"ปวช.1/1",subject:"การเขียนโปรแกรม",status:"ขาด",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A032",date:"2026-11-05",sid:"S002",room:"ปวช.1/1",subject:"การเขียนโปรแกรม",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A033",date:"2026-11-05",sid:"S003",room:"ปวช.1/1",subject:"การเขียนโปรแกรม",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A034",date:"2026-11-05",sid:"S004",room:"ปวช.1/1",subject:"การเขียนโปรแกรม",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A035",date:"2026-11-05",sid:"S005",room:"ปวช.1/1",subject:"การเขียนโปรแกรม",status:"สาย",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A036",date:"2026-11-05",sid:"S006",room:"ปวช.1/2",subject:"การเขียนโปรแกรม",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A037",date:"2026-11-05",sid:"S007",room:"ปวช.1/2",subject:"การเขียนโปรแกรม",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A038",date:"2026-11-05",sid:"S008",room:"ปวช.1/2",subject:"การเขียนโปรแกรม",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A039",date:"2026-11-05",sid:"S009",room:"ปวช.1/2",subject:"การเขียนโปรแกรม",status:"สาย",late:10,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A040",date:"2026-11-05",sid:"S010",room:"ปวช.1/2",subject:"การเขียนโปรแกรม",status:"สาย",late:20,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A041",date:"2026-11-06",sid:"S001",room:"ปวช.1/1",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A042",date:"2026-11-06",sid:"S002",room:"ปวช.1/1",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A043",date:"2026-11-06",sid:"S003",room:"ปวช.1/1",subject:"ฐานข้อมูล",status:"สาย",late:20,hours:2,submit:"ส่งแล้ว"},
+  {id:"A044",date:"2026-11-06",sid:"S004",room:"ปวช.1/1",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:25,submit:"ส่งแล้ว"},
+  {id:"A045",date:"2026-11-06",sid:"S005",room:"ปวช.1/1",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A046",date:"2026-11-06",sid:"S006",room:"ปวช.1/2",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A047",date:"2026-11-06",sid:"S007",room:"ปวช.1/2",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A048",date:"2026-11-06",sid:"S008",room:"ปวช.1/2",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A049",date:"2026-11-06",sid:"S009",room:"ปวช.1/2",subject:"ฐานข้อมูล",status:"สาย",late:30,hours:2,submit:"ส่งแล้ว"},
+  {id:"A050",date:"2026-11-06",sid:"S010",room:"ปวช.1/2",subject:"ฐานข้อมูล",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A051",date:"2026-11-09",sid:"S001",room:"ปวช.1/1",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A052",date:"2026-11-09",sid:"S002",room:"ปวช.1/1",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A052",date:"2026-11-09",sid:"S002",room:"ปวช.1/1",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"}, // duplicate
+  {id:"A054",date:"2026-11-09",sid:"S004",room:"ปวช.1/1",subject:"การสร้างเว็บไซต์",status:"ลา",late:0,hours:2,submit:"ยังไม่ส่ง"},
+  {id:"A055",date:"2026-11-09",sid:"S005",room:"ปวช.1/1",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A056",date:"2026-11-09",sid:"S006",room:"ปวช.1/2",subject:"การสร้างเว็บไซต์",status:"สาย",late:30,hours:2,submit:"ส่งแล้ว"},
+  {id:"A057",date:"2026-11-09",sid:"S007",room:"ปวช.1/2",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A058",date:"2026-11-09",sid:"S008",room:"ปวช.1/2",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A059",date:"2026-11-09",sid:"S009",room:"ปวช.1/2",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+  {id:"A060",date:"2026-11-09",sid:"S010",room:"ปวช.1/2",subject:"การสร้างเว็บไซต์",status:"มาเรียน",late:0,hours:2,submit:"ส่งแล้ว"},
+];
+
+// =====================================================================
+//  ERROR DEFINITIONS
+// =====================================================================
+const ERRORS = [
+  {
+    type:"red", icon:"🚨",
+    title:"ข้อมูลซ้ำกัน (Duplicate Record)",
+    desc:"พบรหัสบันทึก A052 ซ้ำกัน 2 ครั้ง ในวันที่ 2026-11-09 สำหรับนักเรียน S002 วิชาการสร้างเว็บไซต์ ซึ่งเป็นรายการเดียวกันทุกประการ ทำให้ข้อมูลนับซ้ำ",
+    tags:["A052","Duplicate","S002","2026-11-09"],
+    fix:"ควรลบรายการซ้ำออก 1 รายการ เหลือไว้เพียง 1 รายการ"
+  },
+  {
+    type:"red", icon:"🚨",
+    title:"ค่าเป็นลบ — นาทีที่สาย (Negative Late Minutes)",
+    desc:"รายการ A026 บันทึกว่า 'สาย' แต่ค่า 'นาทีที่สาย' = -10 ซึ่งเป็นค่าที่เป็นไปไม่ได้ทางกายภาพ ค่านาทีที่สายต้องเป็น ≥ 0 เสมอ",
+    tags:["A026","late=-10","S006","การสร้างเว็บไซต์"],
+    fix:"ควรแก้ไขเป็น 10 (สาย 10 นาที) หรือขอข้อมูลย้อนกลับจากผู้บันทึก"
+  },
+  {
+    type:"red", icon:"🚨",
+    title:"ชั่วโมงเรียนผิดปกติ (Outlier — Hours)",
+    desc:"รายการ A044 มีค่า 'ชั่วโมงเรียน' = 25 ชั่วโมง ซึ่งสูงผิดปกติมาก (ทุกรายการอื่นมีค่า 2 ชั่วโมง) อาจเกิดจากการพิมพ์ผิด เช่น พิมพ์ 25 แทน 2",
+    tags:["A044","hours=25","S004","ฐานข้อมูล"],
+    fix:"ควรแก้ไขเป็น 2 ชั่วโมง ซึ่งสอดคล้องกับทุกรายการในชุดข้อมูล"
+  },
+  {
+    type:"warn", icon:"⚠️",
+    title:"ข้อมูลขาดหาย — สถานะส่งงาน (Missing Value)",
+    desc:"รายการ A017 ไม่มีค่าในช่อง 'สถานะส่งงาน' (ค่าว่าง) สำหรับนักเรียน S007 วิชาฐานข้อมูล ทำให้ไม่ทราบสถานะการส่งงาน",
+    tags:["A017","submit=empty","S007","ฐานข้อมูล"],
+    fix:"ควรติดตามและบันทึกสถานะ เช่น 'ส่งแล้ว' หรือ 'ยังไม่ส่ง'"
+  },
+  {
+    type:"warn", icon:"⚠️",
+    title:"Whitespace ในสถานะเข้าเรียน (Extra Spaces)",
+    desc:"รายการ A009 มีค่า 'สถานะเข้าเรียน' = \" มาเรียน \" (มีช่องว่างด้านหน้าและด้านหลัง) ซึ่งอาจทำให้การกรองหรือเปรียบเทียบข้อมูลผิดพลาด",
+    tags:["A009","whitespace","S009","การเขียนโปรแกรม"],
+    fix:"ควร Trim ค่าออก เหลือเพียง 'มาเรียน'"
+  },
+  {
+    type:"warn", icon:"⚠️",
+    title:"สาย แต่นาทีที่สาย = 0 (Inconsistent Data)",
+    desc:"รายการ A035 บันทึกว่า 'สาย' แต่ค่า 'นาทีที่สาย' = 0 ซึ่งขัดแย้งกัน หากสายควรมีนาทีที่สาย > 0",
+    tags:["A035","status=สาย","late=0","S005"],
+    fix:"ตรวจสอบว่าสาย 0 นาทีหมายความว่าอะไร อาจเป็นข้อผิดพลาดในการบันทึกหรือนักเรียนมาพอดีเวลา"
+  },
+  {
+    type:"info", icon:"ℹ️",
+    title:"รหัสบันทึกขาดหาย A053 (Missing Sequence)",
+    desc:"ลำดับรหัสบันทึกกระโดดจาก A052 ไปยัง A054 โดยไม่มี A053 บันทึกอยู่ในชุดข้อมูล อาจหมายความว่ามีการลบรายการออก หรือรายการยังไม่ถูกบันทึก",
+    tags:["A053","missing sequence","2026-11-09"],
+    fix:"ตรวจสอบว่า A053 ถูกลบออกจากระบบหรือไม่เคยถูกบันทึก"
+  }
+];
+
+// Error records for table
+const ERROR_RECORDS = [
+  {...RAW[8],  errors:["Whitespace ในสถานะเข้าเรียน"]},
+  {...RAW[16], errors:["ค่าว่าง — สถานะส่งงาน"]},
+  {...RAW[25], errors:["นาทีที่สายเป็นลบ (-10)"]},
+  {...RAW[34], errors:["สาย แต่นาทีที่สาย = 0"]},
+  {...RAW[43], errors:["ชั่วโมงเรียน = 25 (ผิดปกติ)"]},
+  {...RAW[51], errors:["รหัสบันทึก A052 ซ้ำ (ครั้งที่ 1)"]},
+  {...RAW[52], errors:["รหัสบันทึก A052 ซ้ำ (ครั้งที่ 2)"]},
+];
+
+// =====================================================================
+//  CLEAN DATA (normalized status)
+// =====================================================================
+const DATA = RAW.map(r => ({
+  ...r,
+  status: r.status.trim(),
+  submit: r.submit.trim() || "(ไม่ระบุ)"
+}));
+
+// =====================================================================
+//  STATE
+// =====================================================================
+let currentPage = 1;
+const PAGE_SIZE = 10;
+let filteredData = [...DATA];
+
+// chart instances
+const chartInstances = {};
+
+// =====================================================================
+//  NAVIGATION
+// =====================================================================
+const sections = ["dashboard","table","charts","errors","summary"];
+const titles = {
+  dashboard:"📊 ภาพรวม Dashboard",
+  table:"📋 ตารางข้อมูล",
+  charts:"📈 กราฟ & วิเคราะห์",
+  errors:"⚠️ ข้อผิดพลาดในข้อมูล",
+  summary:"📝 สรุปข้อมูล"
+};
+
+function showSection(name) {
+  sections.forEach(s => {
+    document.getElementById("sec-"+s).classList.toggle("active", s===name);
+  });
+  document.querySelectorAll(".nav-item").forEach((el,i) => {
+    el.classList.toggle("active", el.getAttribute("onclick") === `showSection('${name}')`);
+  });
+  document.getElementById("page-title").textContent = titles[name];
+  if(name==="charts") setTimeout(renderCharts, 50);
+  if(name==="summary") renderSummary();
+}
+
+// =====================================================================
+//  HELPERS
+// =====================================================================
+function statusBadge(s) {
+  const cls = s.includes("มาเรียน") ? "มาเรียน" : s==="ขาด" ? "ขาด" : s==="สาย" ? "สาย" : s==="ลา" ? "ลา" : "";
+  if(!cls) return `<span class="status-badge status-missing">${s||"–"}</span>`;
+  return `<span class="status-badge status-${cls}">${s}</span>`;
+}
+function submitBadge(s) {
+  if(s==="ส่งแล้ว") return `<span class="status-badge status-ส่งแล้ว">✓ ส่งแล้ว</span>`;
+  if(s==="ยังไม่ส่ง") return `<span class="status-badge status-ยังไม่ส่ง">✗ ยังไม่ส่ง</span>`;
+  return `<span class="status-badge status-missing">${s}</span>`;
+}
+function count(arr, key, val) { return arr.filter(r=>r[key]===val).length; }
+
+function destroyChart(id) {
+  if(chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+function makeChart(id, config) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if(!ctx) return;
+  chartInstances[id] = new Chart(ctx, config);
+}
+
+const PALETTE = ["#4f46e5","#10b981","#f59e0b","#ef4444","#3b82f6","#8b5cf6","#ec4899","#06b6d4"];
+const ATT_COLORS = { มาเรียน:"#10b981", ขาด:"#ef4444", สาย:"#f59e0b", ลา:"#3b82f6" };
+
+// =====================================================================
+//  DASHBOARD
+// =====================================================================
+function initDashboard() {
+  const present = count(DATA,"status","มาเรียน");
+  const absent  = count(DATA,"status","ขาด");
+  const late    = count(DATA,"status","สาย");
+  const leave   = count(DATA,"status","ลา");
+  const sub     = count(DATA,"submit","ส่งแล้ว");
+  const nosub   = DATA.filter(r=>r.submit==="ยังไม่ส่ง").length;
+
+  document.getElementById("cnt-present").textContent = present;
+  document.getElementById("cnt-absent").textContent = absent;
+  document.getElementById("cnt-late").textContent = late;
+  document.getElementById("cnt-leave").textContent = leave;
+  document.getElementById("cnt-submitted").textContent = sub;
+  document.getElementById("cnt-notsubmit").textContent = nosub;
+
+  // Pie: attendance
+  makeChart("dash-pie", {
+    type:"doughnut",
+    data:{ labels:["มาเรียน","ขาด","สาย","ลา"], datasets:[{data:[present,absent,late,leave], backgroundColor:["#10b981","#ef4444","#f59e0b","#3b82f6"], borderWidth:2}] },
+    options:{ plugins:{ legend:{ position:"bottom" } }, cutout:"60%" }
+  });
+
+  // Bar: by subject
+  const subjects = ["การเขียนโปรแกรม","ฐานข้อมูล","การสร้างเว็บไซต์"];
+  const statuses = ["มาเรียน","ขาด","สาย","ลา"];
+  makeChart("dash-bar", {
+    type:"bar",
+    data:{ labels:subjects, datasets: statuses.map((s,i)=>({ label:s, data:subjects.map(sub=>count(DATA.filter(r=>r.subject===sub),"status",s)), backgroundColor:["#10b981","#ef4444","#f59e0b","#3b82f6"][i] })) },
+    options:{ scales:{ x:{stacked:true}, y:{stacked:true,beginAtZero:true} }, plugins:{ legend:{ position:"bottom" } } }
+  });
+
+  // Pie: submit
+  makeChart("dash-submit-pie", {
+    type:"doughnut",
+    data:{ labels:["ส่งแล้ว","ยังไม่ส่ง","ไม่ระบุ"], datasets:[{ data:[sub,nosub,DATA.filter(r=>r.submit==="(ไม่ระบุ)").length], backgroundColor:["#10b981","#ef4444","#9ca3af"], borderWidth:2 }] },
+    options:{ plugins:{ legend:{ position:"bottom" } }, cutout:"60%" }
+  });
+
+  // Bar: by room
+  const rooms = ["ปวช.1/1","ปวช.1/2"];
+  makeChart("dash-room-bar", {
+    type:"bar",
+    data:{ labels:rooms, datasets: statuses.map((s,i)=>({ label:s, data:rooms.map(rm=>count(DATA.filter(r=>r.room===rm),"status",s)), backgroundColor:["#10b981","#ef4444","#f59e0b","#3b82f6"][i] })) },
+    options:{ plugins:{ legend:{ position:"bottom" } }, scales:{ x:{stacked:false}, y:{beginAtZero:true} } }
+  });
+}
+
+// =====================================================================
+//  TABLE
+// =====================================================================
+function applyFilters() {
+  const room    = document.getElementById("f-room").value;
+  const subject = document.getElementById("f-subject").value;
+  const status  = document.getElementById("f-status").value;
+  const submit  = document.getElementById("f-submit").value;
+  const date    = document.getElementById("f-date").value;
+
+  filteredData = DATA.filter(r => {
+    if(room && r.room !== room) return false;
+    if(subject && r.subject !== subject) return false;
+    if(status && r.status !== status) return false;
+    if(submit && r.submit !== submit) return false;
+    if(date && r.date !== date) return false;
+    return true;
+  });
+  currentPage = 1;
+  renderTable();
+}
+
+function clearFilters() {
+  ["f-room","f-subject","f-status","f-submit"].forEach(id => document.getElementById(id).value="");
+  document.getElementById("f-date").value="";
+  filteredData = [...DATA];
+  currentPage = 1;
+  renderTable();
+}
+
+function renderTable() {
+  const total = filteredData.length;
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const slice = filteredData.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE);
+
+  document.getElementById("pager-info").textContent =
+    `แสดง ${Math.min((currentPage-1)*PAGE_SIZE+1, total)}–${Math.min(currentPage*PAGE_SIZE, total)} จาก ${total} รายการ`;
+
+  const tbody = document.getElementById("table-body");
+  tbody.innerHTML = slice.map(r => `
+    <tr>
+      <td><b>${r.id}</b></td>
+      <td>${r.date}</td>
+      <td>${r.sid}</td>
+      <td>${r.room}</td>
+      <td>${r.subject}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td>${r.late > 0 ? r.late+" นาที" : r.late < 0 ? `<span style="color:var(--danger);font-weight:700">${r.late}</span>` : "–"}</td>
+      <td>${r.hours > 10 ? `<span style="color:var(--danger);font-weight:700">${r.hours}</span>` : r.hours}</td>
+      <td>${submitBadge(r.submit)}</td>
+    </tr>`).join("");
+
+  // Pager
+  const pager = document.getElementById("pager");
+  pager.innerHTML = "";
+  if(currentPage > 1) { const b=document.createElement("button"); b.textContent="‹"; b.onclick=()=>{currentPage--;renderTable();}; pager.appendChild(b); }
+  for(let p=1;p<=pages;p++) {
+    const b=document.createElement("button"); b.textContent=p;
+    if(p===currentPage) b.classList.add("active");
+    b.onclick=(()=>{const pp=p;return()=>{currentPage=pp;renderTable();}})();
+    pager.appendChild(b);
+  }
+  if(currentPage < pages) { const b=document.createElement("button"); b.textContent="›"; b.onclick=()=>{currentPage++;renderTable();}; pager.appendChild(b); }
+}
+
+// =====================================================================
+//  CHARTS
+// =====================================================================
+function renderCharts() {
+  const room    = document.getElementById("cf-room").value;
+  const subject = document.getElementById("cf-subject").value;
+  let d = DATA.filter(r => {
+    if(room && r.room!==room) return false;
+    if(subject && r.subject!==subject) return false;
+    return true;
+  });
+
+  const statuses = ["มาเรียน","ขาด","สาย","ลา"];
+  const subjects = ["การเขียนโปรแกรม","ฐานข้อมูล","การสร้างเว็บไซต์"];
+  const rooms    = ["ปวช.1/1","ปวช.1/2"];
+
+  // Pie attendance
+  const attCounts = statuses.map(s=>count(d,"status",s));
+  makeChart("c-att-pie",{type:"doughnut",data:{labels:statuses,datasets:[{data:attCounts,backgroundColor:statuses.map(s=>ATT_COLORS[s]),borderWidth:2}]},options:{plugins:{legend:{position:"bottom"}},cutout:"55%"}});
+
+  // Bar attendance
+  makeChart("c-att-bar",{type:"bar",data:{labels:statuses,datasets:[{label:"จำนวน",data:attCounts,backgroundColor:statuses.map(s=>ATT_COLORS[s]),borderRadius:6}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+
+  // Pie submit
+  const sub=count(d,"submit","ส่งแล้ว"), nosub=d.filter(r=>r.submit==="ยังไม่ส่ง").length, na=d.filter(r=>r.submit==="(ไม่ระบุ)").length;
+  makeChart("c-sub-pie",{type:"doughnut",data:{labels:["ส่งแล้ว","ยังไม่ส่ง","ไม่ระบุ"],datasets:[{data:[sub,nosub,na],backgroundColor:["#10b981","#ef4444","#9ca3af"],borderWidth:2}]},options:{plugins:{legend:{position:"bottom"}},cutout:"55%"}});
+
+  // Grouped bar: subject
+  makeChart("c-subject-bar",{type:"bar",data:{labels:subjects,datasets:statuses.map((s,i)=>({label:s,data:subjects.map(sub=>count(d.filter(r=>r.subject===sub),"status",s)),backgroundColor:["#10b981","#ef4444","#f59e0b","#3b82f6"][i],borderRadius:4}))},options:{plugins:{legend:{position:"bottom"}},scales:{x:{stacked:false},y:{beginAtZero:true}}}});
+
+  // Bar: by room
+  makeChart("c-room-bar",{type:"bar",data:{labels:rooms,datasets:statuses.map((s,i)=>({label:s,data:rooms.map(rm=>count(d.filter(r=>r.room===rm),"status",s)),backgroundColor:["#10b981","#ef4444","#f59e0b","#3b82f6"][i],borderRadius:4}))},options:{plugins:{legend:{position:"bottom"}},scales:{x:{stacked:false},y:{beginAtZero:true}}}});
+
+  // Bar: late minutes per student
+  const students = [...new Set(d.filter(r=>r.status==="สาย").map(r=>r.sid))].sort();
+  const lateData = students.map(s=>d.filter(r=>r.sid===s&&r.status==="สาย").reduce((a,r)=>a+(r.late>0?r.late:0),0));
+  makeChart("c-late-bar",{type:"bar",data:{labels:students,datasets:[{label:"รวมนาทีที่สาย",data:lateData,backgroundColor:"#f59e0b",borderRadius:6}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+}
+
+// =====================================================================
+//  ERRORS
+// =====================================================================
+function renderErrors() {
+  const list = document.getElementById("error-list");
+  list.innerHTML = ERRORS.map(e => `
+    <div class="error-item ${e.type==="warn"?"warn":e.type==="info"?"info":""}">
+      <div class="error-icon">${e.icon}</div>
+      <div class="error-body">
+        <div class="error-title">${e.title}</div>
+        <div class="error-desc">${e.desc}</div>
+        <div style="margin-top:6px;padding:8px;background:#f8fafc;border-radius:6px;font-size:0.78rem;color:#374151;">
+          <b>💡 การแก้ไขที่แนะนำ:</b> ${e.fix}
+        </div>
+        <div class="error-meta">
+          ${e.tags.map(t=>`<span class="error-tag ${e.type==="red"?"red":e.type==="warn"?"yellow":"blue"}">${t}</span>`).join("")}
+        </div>
+      </div>
+    </div>`).join("");
+
+  // Error table
+  const tbody = document.getElementById("error-table-body");
+  tbody.innerHTML = ERROR_RECORDS.map(r => `
+    <tr style="background:#fff9f9;">
+      <td><b>${r.id}</b></td>
+      <td>${r.date}</td>
+      <td>${r.sid}</td>
+      <td>${r.room}</td>
+      <td>${r.subject}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td style="color:${r.late<0?"var(--danger)":"inherit"}">${r.late}</td>
+      <td style="color:${r.hours>10?"var(--danger)":"inherit"}">${r.hours}</td>
+      <td>${submitBadge(r.submit)}</td>
+      <td><span style="background:#fee2e2;color:#991b1b;padding:3px 8px;border-radius:6px;font-size:0.75rem;">${r.errors.join(", ")}</span></td>
+    </tr>`).join("");
+}
+
+// =====================================================================
+//  SUMMARY
+// =====================================================================
+function renderSummary() {
+  const statuses = ["มาเรียน","ขาด","สาย","ลา"];
+  const subjects = ["การเขียนโปรแกรม","ฐานข้อมูล","การสร้างเว็บไซต์"];
+  const rooms    = ["ปวช.1/1","ปวช.1/2"];
+  const total    = DATA.length;
+
+  function progressRow(label, count, total, colorClass) {
+    const pct = Math.round(count/total*100);
+    return `<tr>
+      <td style="padding:8px 10px;font-weight:600;">${label}</td>
+      <td style="padding:8px 10px;">${count}</td>
+      <td style="padding:8px 10px; min-width:120px;">
+        <div class="progress-bar-wrap"><div class="progress-bar ${colorClass}" style="width:${pct}%"></div></div>
+      </td>
+      <td style="padding:8px 10px;">${pct}%</td>
+    </tr>`;
+  }
+
+  document.getElementById("summary-att-table").innerHTML = `
+    <div class="table-wrapper"><table>
+      <thead><tr><th>สถานะ</th><th>จำนวน</th><th>สัดส่วน</th><th>%</th></tr></thead>
+      <tbody>
+        ${progressRow("มาเรียน",count(DATA,"status","มาเรียน"),total,"prog-green")}
+        ${progressRow("ขาด",count(DATA,"status","ขาด"),total,"prog-red")}
+        ${progressRow("สาย",count(DATA,"status","สาย"),total,"prog-yellow")}
+        ${progressRow("ลา",count(DATA,"status","ลา"),total,"prog-blue")}
+      </tbody>
+    </table></div>`;
+
+  document.getElementById("summary-sub-table").innerHTML = `
+    <div class="table-wrapper"><table>
+      <thead><tr><th>สถานะ</th><th>จำนวน</th><th>สัดส่วน</th><th>%</th></tr></thead>
+      <tbody>
+        ${progressRow("ส่งแล้ว",count(DATA,"submit","ส่งแล้ว"),total,"prog-green")}
+        ${progressRow("ยังไม่ส่ง",DATA.filter(r=>r.submit==="ยังไม่ส่ง").length,total,"prog-red")}
+        ${progressRow("ไม่ระบุ",DATA.filter(r=>r.submit==="(ไม่ระบุ)").length,total,"prog-blue")}
+      </tbody>
+    </table></div>`;
+
+  document.getElementById("summary-room-table").innerHTML = `
+    <div class="table-wrapper"><table>
+      <thead><tr><th>ห้อง</th><th>มาเรียน</th><th>ขาด</th><th>สาย</th><th>ลา</th><th>รวม</th></tr></thead>
+      <tbody>
+        ${rooms.map(rm=>{const d=DATA.filter(r=>r.room===rm);return`<tr>
+          <td style="padding:8px 10px;font-weight:600;">${rm}</td>
+          <td style="padding:8px 10px;color:var(--success);">${count(d,"status","มาเรียน")}</td>
+          <td style="padding:8px 10px;color:var(--danger);">${count(d,"status","ขาด")}</td>
+          <td style="padding:8px 10px;color:var(--warning);">${count(d,"status","สาย")}</td>
+          <td style="padding:8px 10px;color:var(--info);">${count(d,"status","ลา")}</td>
+          <td style="padding:8px 10px;font-weight:700;">${d.length}</td>
+        </tr>`;}).join("")}
+      </tbody>
+    </table></div>`;
+
+  document.getElementById("summary-subject-table").innerHTML = `
+    <div class="table-wrapper"><table>
+      <thead><tr><th>วิชา</th><th>มาเรียน</th><th>ขาด</th><th>สาย</th><th>ลา</th><th>รวม</th></tr></thead>
+      <tbody>
+        ${subjects.map(sub=>{const d=DATA.filter(r=>r.subject===sub);return`<tr>
+          <td style="padding:8px 10px;font-weight:600;">${sub}</td>
+          <td style="padding:8px 10px;color:var(--success);">${count(d,"status","มาเรียน")}</td>
+          <td style="padding:8px 10px;color:var(--danger);">${count(d,"status","ขาด")}</td>
+          <td style="padding:8px 10px;color:var(--warning);">${count(d,"status","สาย")}</td>
+          <td style="padding:8px 10px;color:var(--info);">${count(d,"status","ลา")}</td>
+          <td style="padding:8px 10px;font-weight:700;">${d.length}</td>
+        </tr>`;}).join("")}
+      </tbody>
+    </table></div>`;
+
+  // Insights
+  const present = count(DATA,"status","มาเรียน");
+  const absRate = Math.round(count(DATA,"status","ขาด")/total*100);
+  const lateRate = Math.round(count(DATA,"status","สาย")/total*100);
+  const submitRate = Math.round(count(DATA,"submit","ส่งแล้ว")/total*100);
+
+  document.getElementById("insights").innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div style="padding:14px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
+        <div style="font-weight:700;color:#166534;margin-bottom:4px;">✅ อัตราการเข้าเรียน</div>
+        <div style="font-size:1.6rem;font-weight:800;color:#16a34a;">${Math.round(present/total*100)}%</div>
+        <div style="font-size:0.8rem;color:#166534;">นักเรียนมาเรียนสม่ำเสมอในระดับดี</div>
+      </div>
+      <div style="padding:14px;background:#fef3c7;border-radius:10px;border:1px solid #fde68a;">
+        <div style="font-weight:700;color:#92400e;margin-bottom:4px;">⏰ อัตราสาย</div>
+        <div style="font-size:1.6rem;font-weight:800;color:#d97706;">${lateRate}%</div>
+        <div style="font-size:0.8rem;color:#92400e;">ควรปรับปรุงความตรงต่อเวลา</div>
+      </div>
+      <div style="padding:14px;background:#fee2e2;border-radius:10px;border:1px solid #fecaca;">
+        <div style="font-weight:700;color:#991b1b;margin-bottom:4px;">❌ อัตราขาดเรียน</div>
+        <div style="font-size:1.6rem;font-weight:800;color:#dc2626;">${absRate}%</div>
+        <div style="font-size:0.8rem;color:#991b1b;">ต้องติดตามนักเรียนที่ขาดบ่อย</div>
+      </div>
+      <div style="padding:14px;background:#ede9fe;border-radius:10px;border:1px solid #c4b5fd;">
+        <div style="font-weight:700;color:#4c1d95;margin-bottom:4px;">📤 อัตราส่งงาน</div>
+        <div style="font-size:1.6rem;font-weight:800;color:#7c3aed;">${submitRate}%</div>
+        <div style="font-size:0.8rem;color:#4c1d95;">มีนักเรียนส่งงานครึ่งหนึ่งของทั้งหมด</div>
+      </div>
+    </div>
+    <div style="margin-top:14px;padding:14px;background:#f1f5f9;border-radius:10px;border:1px solid var(--border);">
+      <b>📌 ข้อสังเกตสำคัญ:</b>
+      <ul style="margin-top:8px;padding-left:18px;font-size:0.85rem;line-height:2;">
+        <li>นักเรียน <b>S001, S002, S003</b> มีประวัติขาดเรียนและสายหลายครั้ง ควรได้รับการติดตามเป็นพิเศษ</li>
+        <li>นักเรียน <b>S009</b> มีรูปแบบสาย + ไม่ส่งงานบ่อยครั้ง</li>
+        <li>วิชา <b>การสร้างเว็บไซต์</b> มีการขาดเรียนสูงสุด</li>
+        <li>ห้อง <b>ปวช.1/1</b> มีอัตราขาดและสายสูงกว่า <b>ปวช.1/2</b></li>
+        <li>พบข้อผิดพลาดในข้อมูล <b>7 รายการ</b> ที่ต้องแก้ไขก่อนนำข้อมูลไปใช้งาน</li>
+      </ul>
+    </div>`;
+}
+
+// =====================================================================
+//  INIT
+// =====================================================================
+document.addEventListener("DOMContentLoaded", () => {
+  initDashboard();
+  filteredData = [...DATA];
+  renderTable();
+  renderErrors();
+});
+</script>
+</body>
+</html>
